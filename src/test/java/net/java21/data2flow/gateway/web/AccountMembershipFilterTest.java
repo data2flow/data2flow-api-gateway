@@ -34,6 +34,7 @@ class AccountMembershipFilterTest extends GatewaySliceTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .header("X-ORG-ID", "2")
                 .header("X-ACCESS-TOKEN-ID", "999")
+                .header("X-SESSION-ID", "sid-forged")
                 .exchange()
                 .expectStatus().isOk()
                 .expectHeader().valueEquals("X-Content-Type-Options", "nosniff")
@@ -45,6 +46,7 @@ class AccountMembershipFilterTest extends GatewaySliceTest {
         assertThat(forwarded.getHeaders().values("X-USER-ID")).containsExactly("7");
         assertThat(forwarded.getHeaders().values("X-ACCESS-TOKEN-ID")).containsExactly("41");
         assertThat(forwarded.getHeader("X-TOKEN-SCOPE")).isEqualTo("read:telemetry,read:devices");
+        assertThat(forwarded.getHeader("X-SESSION-ID")).as("장기 토큰에는 로그인 세션이 없다").isNull();
         assertThat(forwarded.getHeader(HttpHeaders.AUTHORIZATION)).isNull();
     }
 }

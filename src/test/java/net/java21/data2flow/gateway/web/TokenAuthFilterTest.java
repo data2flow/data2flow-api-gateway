@@ -46,6 +46,7 @@ class TokenAuthFilterTest extends GatewaySliceTest {
                     .header("X-TOKEN-SCOPE", "control:devices")
                     .header("X-Internal-Auth", "forged")
                     .header("X-CALLER-SERVICE", "data2flow-flow-engine")
+                    .header("X-SESSION-ID", "sid-forged")
                     .exchange()
                     .expectStatus().isOk();
 
@@ -53,6 +54,7 @@ class TokenAuthFilterTest extends GatewaySliceTest {
             assertThat(forwarded.getPath()).isEqualTo("/core/devices?page=1");
             assertThat(forwarded.getHeaders().values("X-USER-ID")).containsExactly("7");
             assertThat(forwarded.getHeaders().values("X-ORG-ID")).containsExactly("1");
+            assertThat(forwarded.getHeaders().values("X-SESSION-ID")).as("현재 세션은 토큰의 sid만").containsExactly("sid-1");
             assertThat(forwarded.getHeader("X-ACCESS-TOKEN-ID")).isNull();
             assertThat(forwarded.getHeader("X-TOKEN-SCOPE")).isNull();
             assertThat(forwarded.getHeader("X-Internal-Auth")).isNull();
@@ -66,6 +68,7 @@ class TokenAuthFilterTest extends GatewaySliceTest {
         void publicPathStripsIdentity() {
             client.post().uri("/api/v1/auth/login")
                     .header("X-USER-ID", "1")
+                    .header("X-SESSION-ID", "sid-forged")
                     .header("X-ORG-ID", "1")
                     .bodyValue("{\"loginId\":\"kim.op\",\"password\":\"x\"}")
                     .exchange()
@@ -75,7 +78,24 @@ class TokenAuthFilterTest extends GatewaySliceTest {
             assertThat(forwarded.getPath()).isEqualTo("/auth/login");
             assertThat(forwarded.getHeader("X-USER-ID")).isNull();
             assertThat(forwarded.getHeader("X-ORG-ID")).isNull();
+            assertThat(forwarded.getHeader("X-SESSION-ID")).isNull();
             assertThat(backend.introspectRequests()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("TC-IAM-202 캐시 적중이어도 X-SESSION-ID는 토큰의 sid로 넣는다(위조 값은 지운다)")
+        void sessionIdFromCachedPrincipal() {
+            String token = userToken();
+            client.get().uri("/api/v1/core/accounts/me/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .exchange().expectStatus().isOk();
+            client.get().uri("/api/v1/core/accounts/me/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .header("x-session-id", "sid-other")
+                    .exchange().expectStatus().isOk();
+
+            assertThat(backend.introspectRequests()).as("두 번째는 캐시 적중").hasSize(1);
+            assertThat(backend.lastDownstream().getHeaders().values("X-SESSION-ID")).containsExactly("sid-1");
         }
 
         @Test
