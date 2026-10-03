@@ -1,4 +1,9 @@
 # 로컬 개발. 인프라는 s3 SSH 터널·공용 개발 DB로 붙는다(design/deployment.md §8.2). 비밀값은 루트 .env
+# Redis: SSH 터널 localhost:6379(DATA2FLOW_REDIS_*). 하위 서비스 주소는 DATA2FLOW_{AUTH,CORE,AI,MCP}_URI로 바꾼다
 logging:
   level:
     net.java21.data2flow: DEBUG
+
+data2flow:
+  gateway:
+    mcp-host: ${DATA2FLOW_MCP_HOST:}

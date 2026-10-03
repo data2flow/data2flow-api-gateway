@@ -1,5 +1,10 @@
-# prod: JSON 로그(요청 ID는 MDC requestId), 비밀값은 k8s Secret 환경변수
+# prod: JSON 로그(요청 ID는 로그 키 requestId), 비밀값은 k8s Secret 환경변수
 logging:
   structured:
     format:
       console: ecs
+
+spring:
+  data:
+    redis:
+      host: ${DATA2FLOW_REDIS_HOST:10.116.64.14}

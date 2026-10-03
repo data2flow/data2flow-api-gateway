@@ -27,6 +27,7 @@
         <data2flow-contracts.version>0.1.0-SNAPSHOT</data2flow-contracts.version>
         <!-- gateway만 Boot 4.0.x + Spring Cloud 2025.1.x 정식판(2026-10-03 사용자 결정). 4.1용 2026.0은 아직 시험판 -->
         <spring-cloud.version>2025.1.3</spring-cloud.version>
+        <mockwebserver.version>4.12.0</mockwebserver.version>
     </properties>
 
     <!-- data2flow-contracts·data2flow-bom은 GitHub Packages에 있다. 읽기에도 토큰이 필요하다(README 참고) -->
@@ -75,10 +76,37 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- 호출 한도(토큰 버킷)·폐기 목록 조회·폐기 이벤트 구독(Pub/Sub). Lettuce(Apache-2.0/MIT) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 테스트 전용. 라이선스: Testcontainers MIT, MockWebServer Apache-2.0, Awaitility Apache-2.0 (design/testing/backend.md) -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
+            <version>${mockwebserver.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -9,12 +9,27 @@ spring:
       enabled: true
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  # 호출 한도·폐기 목록·폐기 이벤트(s4 Redis, 키 접두사 data2flow:, ADR-022). 비밀번호는 환경변수(로컬 .env, 운영 Secret data2flow-redis)
+  data:
+    redis:
+      host: ${DATA2FLOW_REDIS_HOST:localhost}
+      port: ${DATA2FLOW_REDIS_PORT:6379}
+      username: ${DATA2FLOW_REDIS_USERNAME:}
+      password: ${DATA2FLOW_REDIS_PASSWORD:}
+      database: ${DATA2FLOW_REDIS_DATABASE:0}
+      timeout: 1s
+      connect-timeout: 1s
   cloud:
     gateway:
       server:
         webflux:
-          # 라우트는 M1에서 채운다(auth·core 등). 외부 경로 /api/v1/{service}/** → stripPrefix(2) → http://data2flow-{service}
+          # 라우트는 RouteConfig(RouteLocator 빈)에 있다. catch-all 없음(auth.md §2)
           routes: []
+          httpclient:
+            connect-timeout: 2000
+            response-timeout: 10s   # 공통 응답 타임아웃(auth.md §2). MCP 300s, 실시간 스트림은 제한 없음(라우트 메타데이터)
+          # X-Forwarded-For를 믿을 프록시(BFF·Ingress 파드) IP 정규식. 비우면 아무것도 믿지 않고 접속 주소를 쓴다(auth.md §5)
+          trusted-proxies: ${DATA2FLOW_GATEWAY_TRUSTED_PROXIES:}
 
 server:
   port: 8080
@@ -32,6 +47,44 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # Redis 장애는 요청 단위로 fail-closed 503을 내므로 프로브(재시작·트래픽 차단)에는 넣지 않는다
+    redis:
+      enabled: false
   metrics:
     tags:
       application: ${spring.application.name}
+
+data2flow:
+  gateway:
+    # 라우트 대상(k8s Service DNS, ADR-013·017). 내부 통신은 HTTP 80
+    services:
+      auth: ${DATA2FLOW_AUTH_URI:http://data2flow-auth}
+      core: ${DATA2FLOW_CORE_URI:http://data2flow-core-api}
+      ai: ${DATA2FLOW_AI_URI:http://data2flow-ai}
+      mcp: ${DATA2FLOW_MCP_URI:http://data2flow-ai}
+    # 이 호스트로 들어온 요청은 /mcp/**만 받는다(ADR-024). 비우면 경로로만 가른다
+    mcp-host: ${DATA2FLOW_MCP_HOST:data2flow-mcp.java21.net}
+    mcp-response-timeout: 300s
+    unavailable-retry-after: 5s
+    introspection:
+      path: /internal/auth/introspect
+      connect-timeout: 1s
+      response-timeout: 2s
+      cache-ttl: 30s            # 상한 30s(IAM-07.10). 더 크게 적어도 30s로 줄인다
+      cache-max-entries: 100000
+    revocation:
+      key-prefix: "data2flow:bl:"
+      channel: "data2flow:auth.revocations"
+      timeout: 1s
+    rate-limit:
+      enabled: true
+      key-prefix: "data2flow:gw:rl:"
+      timeout: 500ms
+      login:       { limit: 20,   window: 60s }   # BR-IAM-23 IP당 분당 20회
+      refresh:     { limit: 60,   window: 60s }
+      account:     { limit: 20,   window: 60s }
+      public-api:  { limit: 120,  window: 60s }
+      failed-auth: { limit: 20,   window: 60s }
+      user:        { limit: 1200, window: 60s }
+      api-token:   { limit: 600,  window: 60s }
